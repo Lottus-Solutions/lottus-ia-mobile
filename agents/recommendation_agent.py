@@ -1,5 +1,10 @@
 from typing import Any
 
+from recomendador import (
+    buscar_top_livros_por_embedding,
+    gerar_embedding_texto,
+    salvar_perfil_leitura,
+)
 from models.recommendation import BookRecommendation
 from repositories.book_repository import BookRepository
 from repositories.profile_repository import ProfileRepository
@@ -8,7 +13,7 @@ from services.gemini_service import GeminiService
 
 
 class RecommendationAgent:
-    MAX_CANDIDATE_BOOKS = 200
+    MAX_CANDIDATE_BOOKS = 5000
 
     def __init__(
         self,
@@ -32,8 +37,18 @@ class RecommendationAgent:
             generated = self.student_repository.build_profile_input(aluno_id)
             if generated:
                 text = self.gemini_service.analisar_perfil(generated)
-                self.profile_repository.upsert_profile(aluno_id, text)
+                embedding = gerar_embedding_texto(text)
+                salvar_perfil_leitura(aluno_id, text, embedding, db=self.profile_repository.db)
                 profile = self.profile_repository.get_profile(aluno_id)
+        elif not profile.get("embedding") and profile.get("perfil_texto"):
+            embedding = gerar_embedding_texto(profile["perfil_texto"])
+            salvar_perfil_leitura(
+                aluno_id,
+                profile["perfil_texto"],
+                embedding,
+                db=self.profile_repository.db,
+            )
+            profile = self.profile_repository.get_profile(aluno_id)
 
         history = self.student_repository.get_reading_history(aluno_id)
         categories = self.student_repository.get_category_preferences(aluno_id)
@@ -53,16 +68,40 @@ class RecommendationAgent:
             }
             for item in history[:8]
         ]
+
+        perfil_texto = (profile or {}).get("perfil_texto", "")
+        perfil_embedding = (profile or {}).get("embedding") or gerar_embedding_texto(perfil_texto)
+        top_livros = buscar_top_livros_por_embedding(
+            perfil_embedding,
+            top_k=10,
+            livros=unread_books,
+            db=self.profile_repository.db,
+        )
+
         slim_books = [
             {
                 "id": book.get("id"),
                 "titulo": book.get("titulo"),
+                "autor": book.get("autor"),
                 "categoria": book.get("categoria"),
                 "total_paginas": book.get("total_paginas"),
-                "disponivel": book.get("disponivel"),
+                "similaridade": book.get("similaridade"),
             }
-            for book in unread_books
+            for book in top_livros
         ]
+
+        if not slim_books:
+            slim_books = [
+                {
+                    "id": book.get("id"),
+                    "titulo": book.get("titulo"),
+                    "autor": book.get("autor"),
+                    "categoria": book.get("categoria"),
+                    "total_paginas": book.get("total_paginas"),
+                    "disponivel": book.get("disponivel"),
+                }
+                for book in unread_books[:10]
+            ]
 
         payload = {
             "aluno": student,

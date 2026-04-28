@@ -1,3 +1,4 @@
+from recomendador import gerar_embedding_texto, salvar_perfil_leitura
 from repositories.profile_repository import ProfileRepository
 from repositories.student_repository import StudentRepository
 from services.gemini_service import GeminiService
@@ -20,7 +21,8 @@ class ProfileAgent:
             raise ValueError("Aluno nao encontrado")
 
         perfil_texto = self.gemini_service.analisar_perfil(profile_input)
-        self.profile_repository.upsert_profile(aluno_id, perfil_texto)
+        embedding = gerar_embedding_texto(perfil_texto)
+        salvar_perfil_leitura(aluno_id, perfil_texto, embedding, db=self.profile_repository.db)
 
         return {
             "aluno_id": aluno_id,
