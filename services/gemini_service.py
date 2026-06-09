@@ -88,3 +88,27 @@ class GeminiService:
             ]
         )
         return transcription.strip()
+
+    def extrair_notas_boletim(self, pdf_bytes: bytes) -> list[dict]:
+        if not self.client:
+            return []
+
+        prompt = (
+            "Analise este boletim escolar e extraia todas as disciplinas com suas respectivas notas. "
+            "Retorne um JSON array com objetos no formato: "
+            '[{"disciplina": "nome da materia", "nota": valor_numerico, "situacao": "aprovado|recuperacao|reprovado"}]. '
+            "Considere aprovado nota >= 7.0, recuperacao entre 5.0 e 6.9, reprovado abaixo de 5.0. "
+            "Se nao conseguir identificar a nota numerica, use null. "
+            "Retorne somente o JSON array, sem texto adicional."
+        )
+        text = self._generate(
+            [
+                prompt,
+                types.Part.from_bytes(data=pdf_bytes, mime_type="application/pdf"),
+            ]
+        )
+        return extract_json_array(text)
+
+    def gerar_plano_boletim(self, payload: dict) -> str:
+        prompt = load_prompt("bulletin_prompt.txt")
+        return self.gerar_texto(prompt, payload)
