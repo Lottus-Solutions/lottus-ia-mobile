@@ -52,15 +52,20 @@ class BulletinAgent:
         )
 
         if not plano_acao:
-            plano_acao = (
-                "Com base nas notas do boletim, recomendamos iniciar uma rotina de leitura diaria de 20 minutos, "
-                "priorizando textos relacionados as disciplinas com maior dificuldade. "
-                "Acompanhe o progresso semanalmente e converse com a escola a cada 15 dias."
-            )
+            plano_acao = {
+                "diagnostico_geral": (
+                    "Com base nas notas do boletim, recomendamos iniciar uma rotina de leitura diaria "
+                    "de 20 minutos, priorizando textos relacionados as disciplinas com maior dificuldade."
+                ),
+                "disciplinas_prioritarias": [],
+                "plano_semanal_leitura": [],
+                "como_pais_podem_ajudar": [
+                    "Acompanhe o progresso semanalmente e converse com a escola a cada 15 dias."
+                ],
+                "meta_30_dias": "Manter uma rotina de leitura constante para apoiar a evolucao academica.",
+            }
 
         return {
             "aluno_id": aluno_id,
-            "notas": notas,
-            "media_geral": media_geral,
-            "plano_acao": plano_acao,
+            **plano_acao,
         }

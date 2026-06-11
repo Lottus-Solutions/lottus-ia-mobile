@@ -4,11 +4,23 @@ from decimal import Decimal
 from typing import Any
 
 from google import genai
-from google.genai import types
+from google.genai import errors, types
 
 from app.config import Settings
+from models.bulletin import PlanoAcao
+from models.recommendation import BookRecommendation
 from utils.json_utils import extract_json_array
 from utils.prompt_loader import load_prompt
+
+
+class GeminiUnavailableError(Exception):
+    """Raised when the Gemini API is temporarily overloaded or rate-limited."""
+
+
+def _is_transient_error(exc: errors.APIError) -> bool:
+    if isinstance(exc, errors.ServerError):
+        return True
+    return isinstance(exc, errors.ClientError) and exc.code == 429
 
 
 class GeminiService:
@@ -24,16 +36,24 @@ class GeminiService:
         if not self.client:
             return ""
 
-        response = self.client.models.generate_content(
-            model=self.model,
-            contents=contents,
-        )
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=contents,
+            )
+        except errors.APIError as exc:
+            if _is_transient_error(exc):
+                raise GeminiUnavailableError("Gemini esta sobrecarregado no momento") from exc
+            raise
+
         return (response.text or "").strip()
 
     def gerar_texto(self, prompt: str, payload: dict[str, Any]) -> str:
         data = json.dumps(payload, ensure_ascii=False, default=self._json_default)
-        text = self._generate([prompt, data])
-        return text
+        try:
+            return self._generate([prompt, data])
+        except GeminiUnavailableError:
+            return ""
 
     @staticmethod
     def _json_default(value: Any) -> Any:
@@ -60,14 +80,30 @@ class GeminiService:
         )
 
     def recomendar(self, payload: dict[str, Any]) -> list[dict[str, str]]:
+        if not self.client:
+            return []
+
         prompt = load_prompt("recommendation_prompt.txt")
-        text = self.gerar_texto(prompt, payload)
-        parsed = extract_json_array(text)
+        data = json.dumps(payload, ensure_ascii=False, default=self._json_default)
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt, data],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=list[BookRecommendation],
+                ),
+            )
+        except errors.APIError as exc:
+            if _is_transient_error(exc):
+                return []
+            raise
 
         recommendations: list[dict[str, str]] = []
-        for item in parsed:
-            titulo = str(item.get("titulo", "")).strip()
-            motivo = str(item.get("motivo", "")).strip()
+        for item in response.parsed or []:
+            titulo = item.titulo.strip()
+            motivo = item.motivo.strip()
             if titulo and motivo:
                 recommendations.append({"titulo": titulo, "motivo": motivo[:180]})
 
@@ -81,12 +117,15 @@ class GeminiService:
             "Transcreva o audio em portugues brasileiro, mantendo fidelidade ao que foi dito "
             "e sem adicionar interpretacoes."
         )
-        transcription = self._generate(
-            [
-                prompt,
-                types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
-            ]
-        )
+        try:
+            transcription = self._generate(
+                [
+                    prompt,
+                    types.Part.from_bytes(data=audio_bytes, mime_type=mime_type),
+                ]
+            )
+        except GeminiUnavailableError:
+            return ""
         return transcription.strip()
 
     def extrair_notas_boletim(self, pdf_bytes: bytes) -> list[dict]:
@@ -109,6 +148,28 @@ class GeminiService:
         )
         return extract_json_array(text)
 
-    def gerar_plano_boletim(self, payload: dict) -> str:
+    def gerar_plano_boletim(self, payload: dict) -> dict | None:
+        if not self.client:
+            return None
+
         prompt = load_prompt("bulletin_prompt.txt")
-        return self.gerar_texto(prompt, payload)
+        data = json.dumps(payload, ensure_ascii=False, default=self._json_default)
+
+        try:
+            response = self.client.models.generate_content(
+                model=self.model,
+                contents=[prompt, data],
+                config=types.GenerateContentConfig(
+                    response_mime_type="application/json",
+                    response_schema=PlanoAcao,
+                ),
+            )
+        except errors.APIError as exc:
+            if _is_transient_error(exc):
+                return None
+            raise
+
+        if not response.parsed:
+            return None
+
+        return response.parsed.model_dump()

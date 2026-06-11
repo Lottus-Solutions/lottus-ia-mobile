@@ -1,10 +1,9 @@
-from dataclasses import asdict, dataclass
+from pydantic import BaseModel
 
 
-@dataclass(slots=True)
-class BookRecommendation:
+class BookRecommendation(BaseModel):
     titulo: str
     motivo: str
 
     def to_dict(self) -> dict:
-        return asdict(self)
+        return self.model_dump()

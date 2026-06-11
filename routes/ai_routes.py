@@ -7,7 +7,7 @@ from agents.reinforcement_chat_agent import ReinforcementChatAgent
 from repositories.book_repository import BookRepository
 from repositories.profile_repository import ProfileRepository
 from repositories.student_repository import StudentRepository
-from services.gemini_service import GeminiService
+from services.gemini_service import GeminiService, GeminiUnavailableError
 
 
 ai_blueprint = Blueprint("ai", __name__)
@@ -106,6 +106,10 @@ def analisar_boletim():
     try:
         result = dependencies["bulletin_agent"].analyze(aluno_id=aluno_id, pdf_bytes=pdf_bytes)
         return jsonify(result), 200
+    except GeminiUnavailableError:
+        return jsonify(
+            {"error": "Servico de IA esta sobrecarregado no momento. Tente novamente em alguns instantes."}
+        ), 503
     except ValueError as exc:
         status_code = 404 if str(exc) == "Aluno nao encontrado" else 400
         return jsonify({"error": str(exc)}), status_code

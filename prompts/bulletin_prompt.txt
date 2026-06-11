@@ -28,25 +28,10 @@ REGRAS OBRIGATÓRIAS:
 - Foque em soluções práticas e realizáveis.
 - Conecte leitura com melhora em cada disciplina mencionada.
 
-ESTRUTURA OBRIGATÓRIA DA RESPOSTA:
-
-1. Diagnóstico geral:
-Avalie brevemente o desempenho geral do aluno com base na média e nas disciplinas.
-
-2. Disciplinas prioritárias:
-Para cada disciplina em dificuldade (máximo 3), indique:
-- O desafio específico
-- Uma estratégia de leitura conectada àquela matéria
-- Uma ação concreta para a semana
-
-3. Plano semanal de leitura:
-Monte uma rotina de 5 dias com tempo e tipo de leitura recomendados.
-
-4. Como os pais podem ajudar:
-Orientações simples para acompanhar sem pressão.
-
-5. Meta dos próximos 30 dias:
-Um objetivo claro e mensurável para o aluno alcançar.
+FORMATO OBRIGATÓRIO:
+Responda preenchendo todos os campos do schema JSON fornecido (diagnóstico geral, disciplinas
+prioritárias com no máximo 3 itens, plano semanal de leitura com 5 dias, orientações para os
+pais e meta dos próximos 30 dias).
 
 TIPOS DE ESTRATÉGIAS QUE VOCÊ PODE USAR:
 - Leitura de paradidáticos relacionados à disciplina.
